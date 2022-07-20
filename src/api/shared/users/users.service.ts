@@ -1,44 +1,46 @@
+import { IsPhoneNumber } from 'class-validator'
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import * as bcrypt from 'bcrypt'
 
-import { User } from './entities/user.entity'
 import { CreateUserDto } from './dto/create-user.dto'
-import { UpdateUserDto } from './dto/update-user.dto'
+import { User as UserModel } from './models/user.model'
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel('User') private readonly userModel: Model<User>) {}
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async create(createUserDto: CreateUserDto) {
-    const { username, email, phone, password: myPlaintextPassword } = createUserDto
-    if (!username || !email || !phone || !myPlaintextPassword)
-      throw new HttpException('Bad Request', HttpStatus.BAD_REQUEST)
-    const user = await this.userModel.findOne({ email }).exec()
-    if (user) throw new HttpException('Username/Email/Phone is already being used', HttpStatus.BAD_REQUEST)
+  constructor(@InjectModel(UserModel.name) private readonly userModel: Model<UserModel>) {}
 
-    //Hash password with bcrypt
+  async create(createUserDto: CreateUserDto): Promise<any> {
+    const { email, phone, password, firstName, lastName } = createUserDto
+    await this.validateCreateUserRequest(createUserDto)
+    //hash password
     const saltRounds = 10
     const salt = bcrypt.genSaltSync(saltRounds)
-    const hash = await bcrypt.hashSync(myPlaintextPassword, salt)
-    return createUserDto
+    const hash = await bcrypt.hashSync(password, salt)
+    //Create new user in database
+    const user = new this.userModel({
+      email,
+      firstName,
+      lastName,
+      phoneNumber: phone,
+      hash,
+    })
+    return user.save()
   }
 
   async findAll() {
-    return await new this.userModel({})
+    return await this.userModel.find({})
   }
 
   async findOne(id: string) {
-    return `This action returns a #${id} user`
+    return await this.userModel.find({ _id: id })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async update(id: string, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`
-  }
-
-  async remove(id: string) {
-    return `This action removes a #${id} user`
+  private async validateCreateUserRequest(createUserDto: CreateUserDto): Promise<void> {
+    const user = await this.userModel.findOne({ email: createUserDto.email }).exec()
+    if (user) {
+      throw new HttpException('This email/phone already exists', HttpStatus.BAD_REQUEST)
+    }
   }
 }

@@ -1,20 +1,27 @@
 import { Module } from '@nestjs/common'
 import { UsersModule } from './api/shared/users/users.module'
-import { ConfigModule } from '@nestjs/config'
+import { ConfigModule, ConfigService } from '@nestjs/config'
 import { MongooseModule } from '@nestjs/mongoose'
+import { AuthModule } from './api/auth/auth.module'
 
 @Module({
   imports: [
-    // Module database Mongoose
-    MongooseModule.forRoot(
-      'mongodb+srv://duydo14:LDDXAsSV58BFS6Jm@cluster0.ygwykkt.mongodb.net/nestjs-demo?retryWrites=true&w=majority'
-    ),
     // Module Config
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // Module database Mongoose
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configSever: ConfigService) => ({
+        uri: configSever.get<string>('DATABASE_URL'),
+      }),
+      inject: [ConfigService],
+    }),
+
     // Module Shared
     UsersModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [],
